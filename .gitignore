@@ -1,5 +1,8 @@
 *.ipa
 *.xcarchive
 *.log
-iOSApp/build
+build/
+iOSApp/build/
+ActualAccounts.xcodeproj
 iOSApp/ActualAccounts.xcodeproj
+.DS_Store

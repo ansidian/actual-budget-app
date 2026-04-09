@@ -153,6 +153,20 @@ final class ActualAPIClient {
         try ensureSuccess(response: response, data: data)
     }
 
+    func fetchAccountBalance(accountId: String) async throws -> Int {
+        if isDemoMode {
+            let since = DemoDataService.shared.demoSinceDateString(daysBack: 120)
+            return DemoDataService.shared.generateTransactions(for: accountId, since: since)
+                .compactMap { $0.amount }
+                .reduce(0, +)
+        }
+        let url = APIEndpoints.accountBalance(base: baseURL, syncId: syncId, accountId: accountId)
+        let request = try buildRequest(url: url, method: "GET")
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+        return try decodeOrLog(APIResponse<Int>.self, from: data, request: request, context: "fetchAccountBalance").data
+    }
+
     func reopenAccount(accountId: String) async throws {
         let url = APIEndpoints.accountReopen(base: baseURL, syncId: syncId, accountId: accountId)
         let request = try buildRequest(url: url, method: "PUT")

@@ -1,0 +1,112 @@
+name: ActualAccounts
+options:
+  minimumXcodeGenVersion: 2.39.0
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: 5.10
+    # The top-level team ID can be empty
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  ActualAccounts:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: iOSApp/Resources/Version.xcconfig
+      Release: iOSApp/Resources/Version.xcconfig
+    sources:
+      - path: iOSApp/App
+      - path: iOSApp/Features
+      - path: iOSApp/UI
+      - path: iOSApp/Resources
+        excludes: [README.md]
+      - path: iOSApp/Shared
+      - path: Shared
+    dependencies:
+      - target: SummaryWidgetExtension
+    info:
+      path: iOSApp/Resources/Info.plist
+      properties:
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.actual.accounts
+        CODE_SIGN_STYLE: Manual
+        # --- FIXED: Provide a placeholder Team ID ---
+        DEVELOPMENT_TEAM: "A1B2C3D4E5"
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        CODE_SIGN_ENTITLEMENTS: iOSApp/Resources/ActualAccounts.entitlements
+        INFOPLIST_FILE: iOSApp/Resources/Info.plist
+        MARKETING_VERSION: $(MARKETING_VERSION)
+        CURRENT_PROJECT_VERSION: $(CURRENT_PROJECT_VERSION)
+
+  SummaryWidgetExtension:
+    type: app-extension
+    platform: iOS
+    configFiles:
+      Debug: iOSApp/Resources/Version.xcconfig
+      Release: iOSApp/Resources/Version.xcconfig
+    sources:
+      - path: iOSApp/SummaryWidget
+      - path: iOSApp/Shared
+      - path: iOSApp/UI
+      - path: Shared
+    info:
+      path: iOSApp/SummaryWidget/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.actual.accounts.SummaryWidget
+        CODE_SIGN_STYLE: Manual
+        # --- FIXED: Provide the same placeholder Team ID ---
+        DEVELOPMENT_TEAM: "A1B2C3D4E5"
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        CODE_SIGN_ENTITLEMENTS: iOSApp/SummaryWidget/SummaryWidgetExtension.entitlements
+        INFOPLIST_FILE: iOSApp/SummaryWidget/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        MARKETING_VERSION: $(MARKETING_VERSION)
+        CURRENT_PROJECT_VERSION: $(CURRENT_PROJECT_VERSION)
+
+  ActualBudgetMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: macOSApp
+      - path: Shared
+    info:
+      path: macOSApp/Resources/Info.plist
+      properties:
+        CFBundleName: Actual Budget
+        CFBundleDisplayName: Actual Budget
+        LSApplicationCategoryType: public.app-category.finance
+        NSSupportsAutomaticTermination: true
+        NSSupportsSuddenTermination: true
+        NSHumanReadableCopyright: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.actual.accounts.mac
+        PRODUCT_NAME: ActualBudgetMac
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_ENTITLEMENTS: macOSApp/Resources/ActualBudgetMac.entitlements
+        INFOPLIST_FILE: macOSApp/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_HARDENED_RUNTIME: YES
+        MACOSX_DEPLOYMENT_TARGET: 15.0
+        SWIFT_VERSION: 5.10
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1

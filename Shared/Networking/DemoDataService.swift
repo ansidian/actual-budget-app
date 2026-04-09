@@ -49,6 +49,13 @@ class DemoDataService {
         return transactions
     }
     
+    func demoSinceDateString(daysBack: Int) -> String {
+        let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+
     func generateBudgetMonth() -> BudgetMonth {
         BudgetMonth(
             month: "2025-10",

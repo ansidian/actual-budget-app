@@ -4,11 +4,12 @@
 # --- Configuration ---
 PROJECT_NAME = ActualAccounts
 SCHEME = ActualAccounts
-PROJECT_DIR = iOSApp
-PROJECT_FILE = $(PROJECT_DIR)/$(PROJECT_NAME).xcodeproj
+PROJECT_DIR = .
+PROJECT_FILE = $(PROJECT_NAME).xcodeproj
 
-BUILD_DIR = $(PROJECT_DIR)/build
+BUILD_DIR = build
 PRODUCTS_DIR = $(BUILD_DIR)/Build/Products/Release-iphoneos
+MAC_PRODUCTS_DIR = $(BUILD_DIR)/Build/Products/Release
 FINAL_IPA = $(PROJECT_NAME).ipa
 
 PAYLOAD_DIR = $(BUILD_DIR)/Payload
@@ -81,13 +82,13 @@ project:
 		echo "❌ xcodegen not found. Please install with: brew install xcodegen"; \
 		exit 1; \
 	fi
-	@if [ ! -d "$(PROJECT_DIR)" ]; then \
-		echo "❌ Project directory '$(PROJECT_DIR)' not found."; \
-		echo "   Please run 'make' from the root of your repository (the directory containing 'iOSApp')."; \
+	@if [ ! -f "project.yml" ]; then \
+		echo "❌ project.yml not found in current directory."; \
+		echo "   Please run 'make' from the root of your repository."; \
 		exit 1; \
 	fi
 	@echo "🛠️  Generating Xcode project with XcodeGen..."
-	@cd $(PROJECT_DIR) && xcodegen generate
+	@xcodegen generate
 	@test -d "$(PROJECT_FILE)" || (echo "❌ Failed to generate project at '$(PROJECT_FILE)'" && exit 1)
 	@echo "✅ Project generated"
 
