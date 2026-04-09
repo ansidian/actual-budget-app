@@ -116,7 +116,31 @@ final class ActualAPIClient {
         let request = try buildRequest(url: url, method: "GET")
         let (data, response) = try await session.data(for: request)
         try ensureSuccess(response: response, data: data)
+        // Debug: dump the income-category payload so we can verify field names
+        // (spent vs received vs something else). Safe to remove once the
+        // income bug is confirmed fixed against a real server.
+        logIncomeCategoriesSample(data: data)
         return try decodeOrLog(BudgetMonthCategoryGroupsResponse.self, from: data, request: request, context: "fetchBudgetMonthCategoryGroups").data
+    }
+
+    private func logIncomeCategoriesSample(data: Data) {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let groups = json["data"] as? [[String: Any]] else { return }
+        for group in groups where (group["is_income"] as? Bool) == true {
+            let name = group["name"] as? String ?? "?"
+            let cats = group["categories"] as? [[String: Any]] ?? []
+            AppLogger.shared.log(
+                "Income group sample",
+                level: .info,
+                context: "fetchBudgetMonthCategoryGroups",
+                metadata: [
+                    "group": name,
+                    "groupKeys": Array(group.keys).sorted(),
+                    "categoryCount": cats.count,
+                    "firstCategory": cats.first ?? [:]
+                ]
+            )
+        }
     }
 
     func createAccount(name: String, offbudget: Bool) async throws -> String {
@@ -191,6 +215,123 @@ final class ActualAPIClient {
         try ensureSuccess(response: response, data: data)
     }
 
+    // MARK: - Schedules
+
+    func fetchSchedules() async throws -> [Schedule] {
+        if isDemoMode { return DemoDataService.shared.generateSchedules() }
+        let url = APIEndpoints.schedules(base: baseURL, syncId: syncId)
+        let request = try buildRequest(url: url, method: "GET")
+        let (data, response) = try await session.data(for: request)
+        do {
+            try ensureSuccess(response: response, data: data)
+        } catch APIError.httpError(let status, _) where status == 404 {
+            throw APIError.unsupportedEndpoint
+        }
+        return try decodeOrLog(SchedulesListResponse.self, from: data, request: request, context: "fetchSchedules").data
+    }
+
+    func fetchSchedule(id: String) async throws -> Schedule {
+        if isDemoMode {
+            return DemoDataService.shared.generateSchedules().first { $0.id == id }
+                ?? Schedule(id: id, name: nil, rule: nil, next_date: nil, completed: nil, posts_transaction: nil, payee: nil, account: nil, amount: nil, amountOp: nil, date: nil)
+        }
+        let url = APIEndpoints.schedule(base: baseURL, syncId: syncId, id: id)
+        let request = try buildRequest(url: url, method: "GET")
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+        return try decodeOrLog(ScheduleResponse.self, from: data, request: request, context: "fetchSchedule").data
+    }
+
+    func createSchedule(_ input: ScheduleInput) async throws -> String {
+        if isDemoMode { return "demo-schedule-\(UUID().uuidString.prefix(8))" }
+        let url = APIEndpoints.schedules(base: baseURL, syncId: syncId)
+        var request = try buildRequest(url: url, method: "POST")
+        let wrapped = ScheduleWrapper(schedule: input)
+        request.httpBody = try JSONEncoder().encode(wrapped)
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+        return try decodeOrLog(ScheduleCreateResponse.self, from: data, request: request, context: "createSchedule").data
+    }
+
+    func updateSchedule(id: String, _ input: ScheduleInput) async throws {
+        if isDemoMode { return }
+        let url = APIEndpoints.schedule(base: baseURL, syncId: syncId, id: id)
+        var request = try buildRequest(url: url, method: "PATCH")
+        let wrapped = ScheduleWrapper(schedule: input)
+        request.httpBody = try JSONEncoder().encode(wrapped)
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+    }
+
+    func deleteSchedule(id: String) async throws {
+        if isDemoMode { return }
+        let url = APIEndpoints.schedule(base: baseURL, syncId: syncId, id: id)
+        let request = try buildRequest(url: url, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+    }
+
+    // MARK: - Notes
+
+    func fetchCategoryNotes(categoryId: String) async throws -> String? {
+        try await fetchNotes(url: APIEndpoints.categoryNotes(base: baseURL, syncId: syncId, categoryId: categoryId), context: "fetchCategoryNotes")
+    }
+
+    func setCategoryNotes(categoryId: String, text: String) async throws {
+        try await putNotes(url: APIEndpoints.categoryNotes(base: baseURL, syncId: syncId, categoryId: categoryId), text: text)
+    }
+
+    func deleteCategoryNotes(categoryId: String) async throws {
+        try await deleteNotes(url: APIEndpoints.categoryNotes(base: baseURL, syncId: syncId, categoryId: categoryId))
+    }
+
+    func fetchAccountNotes(accountId: String) async throws -> String? {
+        try await fetchNotes(url: APIEndpoints.accountNotes(base: baseURL, syncId: syncId, accountId: accountId), context: "fetchAccountNotes")
+    }
+
+    func setAccountNotes(accountId: String, text: String) async throws {
+        try await putNotes(url: APIEndpoints.accountNotes(base: baseURL, syncId: syncId, accountId: accountId), text: text)
+    }
+
+    func deleteAccountNotes(accountId: String) async throws {
+        try await deleteNotes(url: APIEndpoints.accountNotes(base: baseURL, syncId: syncId, accountId: accountId))
+    }
+
+    func fetchBudgetMonthNotes(month: String) async throws -> String? {
+        try await fetchNotes(url: APIEndpoints.budgetMonthNotes(base: baseURL, syncId: syncId, month: month), context: "fetchBudgetMonthNotes")
+    }
+
+    func setBudgetMonthNotes(month: String, text: String) async throws {
+        try await putNotes(url: APIEndpoints.budgetMonthNotes(base: baseURL, syncId: syncId, month: month), text: text)
+    }
+
+    func deleteBudgetMonthNotes(month: String) async throws {
+        try await deleteNotes(url: APIEndpoints.budgetMonthNotes(base: baseURL, syncId: syncId, month: month))
+    }
+
+    private func fetchNotes(url: URL, context: String) async throws -> String? {
+        if isDemoMode { return DemoDataService.shared.demoNote(for: url.path) }
+        let request = try buildRequest(url: url, method: "GET")
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+        return try decodeOrLog(NoteResponse.self, from: data, request: request, context: context).data
+    }
+
+    private func putNotes(url: URL, text: String) async throws {
+        if isDemoMode { return }
+        var request = try buildRequest(url: url, method: "PUT")
+        request.httpBody = try JSONEncoder().encode(NoteRequest(data: text))
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+    }
+
+    private func deleteNotes(url: URL) async throws {
+        if isDemoMode { return }
+        let request = try buildRequest(url: url, method: "DELETE")
+        let (data, response) = try await session.data(for: request)
+        try ensureSuccess(response: response, data: data)
+    }
+
     private func buildRequest(url: URL, method: String) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -259,11 +400,18 @@ final class ActualAPIClient {
 
 enum APIError: Error, LocalizedError {
     case httpError(status: Int, body: String)
+    case unsupportedEndpoint
 
     var errorDescription: String? {
         switch self {
         case let .httpError(status, body):
             return "HTTP \(status): \(body)"
+        case .unsupportedEndpoint:
+            return "This endpoint is not supported by the server."
         }
     }
+}
+
+private struct ScheduleWrapper: Encodable {
+    let schedule: ScheduleInput
 }

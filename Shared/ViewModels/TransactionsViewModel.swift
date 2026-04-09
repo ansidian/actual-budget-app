@@ -45,15 +45,23 @@ final class TransactionsViewModel {
     // MARK: - Derived
 
     var filteredTransactions: [Transaction] {
-        let onBudgetIds = Set(accounts.filter { !$0.offbudget }.map { $0.id })
-        let allIds = Set(accounts.map { $0.id })
-        let target = onBudgetOnly ? onBudgetIds : allIds
         let since = sinceDateString()
-
-        return transactions
-            .filter { target.contains($0.account) }
+        let base: [Transaction]
+        switch scope {
+        case .account:
+            // Per-account scope — transactions are already limited to a single
+            // account by the fetch. On-budget toggle doesn't apply here.
+            base = transactions
+        case .all:
+            let onBudgetIds = Set(accounts.filter { !$0.offbudget }.map { $0.id })
+            let allIds = Set(accounts.map { $0.id })
+            let target = onBudgetOnly ? onBudgetIds : allIds
+            base = transactions
+                .filter { target.contains($0.account) }
+                .filter { !isTransferToOnBudget($0) }
+        }
+        return base
             .filter { $0.date >= since }
-            .filter { !isTransferToOnBudget($0) }
             .filter(matchesSearch)
             .sorted { $0.date > $1.date }
     }

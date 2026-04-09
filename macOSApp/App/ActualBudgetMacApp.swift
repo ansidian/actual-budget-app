@@ -54,6 +54,13 @@ struct ActualBudgetMacApp: App {
                     )
                 }
                 .keyboardShortcut("4", modifiers: [.command])
+                Button("Schedules") {
+                    NotificationCenter.default.post(
+                        name: .switchSidebarSection,
+                        object: SidebarSection.schedules.rawValue
+                    )
+                }
+                .keyboardShortcut("5", modifiers: [.command])
             }
         }
 

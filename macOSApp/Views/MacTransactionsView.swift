@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MacTransactionsView: View {
     @EnvironmentObject private var appState: AppState
+    let accountFilter: Account?
     @State private var vm: TransactionsViewModel?
     @State private var selection: Set<Transaction.ID> = []
     @State private var sortOrder: [KeyPathComparator<Transaction>] = [
@@ -26,7 +27,7 @@ struct MacTransactionsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("Transactions")
+        .navigationTitle(accountFilter?.name ?? "Transactions")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -48,7 +49,13 @@ struct MacTransactionsView: View {
         .searchable(text: searchBinding, placement: .toolbar, prompt: "Search payee, category, notes")
         .task {
             if vm == nil {
-                vm = TransactionsViewModel(appState: appState, scope: .all)
+                let scope: TransactionsViewModel.Scope
+                if let account = accountFilter {
+                    scope = .account(account)
+                } else {
+                    scope = .all
+                }
+                vm = TransactionsViewModel(appState: appState, scope: scope)
                 await vm?.load()
             }
         }
@@ -96,11 +103,13 @@ struct MacTransactionsView: View {
     @ViewBuilder
     private func filterBar(vm: TransactionsViewModel) -> some View {
         HStack(spacing: 16) {
-            Toggle("On-budget only", isOn: Binding(
-                get: { vm.onBudgetOnly },
-                set: { vm.onBudgetOnly = $0 }
-            ))
-            .toggleStyle(.switch)
+            if accountFilter == nil {
+                Toggle("On-budget only", isOn: Binding(
+                    get: { vm.onBudgetOnly },
+                    set: { vm.onBudgetOnly = $0 }
+                ))
+                .toggleStyle(.switch)
+            }
 
             Picker("Range", selection: Binding(
                 get: { vm.filterGranularity },
@@ -156,6 +165,15 @@ struct MacTransactionsView: View {
                 MoneyText(amount: tx.amount, currencyCode: appState.currencyCode, signed: true)
             }
             .width(min: 100, ideal: 130)
+
+            TableColumn("Notes") { (tx: Transaction) in
+                Text(tx.notes ?? "")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(tx.notes ?? "")
+            }
+            .width(min: 80, ideal: 160)
 
             TableColumn("Cleared") { (tx: Transaction) in
                 Image(systemName: (tx.cleared ?? false) ? "checkmark.circle.fill" : "circle")

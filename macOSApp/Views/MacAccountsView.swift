@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MacAccountsView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var vm: AccountsViewModel?
+    @Bindable var vm: AccountsViewModel
     @State private var showingCreate: Bool = false
     @State private var sortOrder: [KeyPathComparator<Account>] = [
         KeyPathComparator(\Account.name)
@@ -10,14 +10,7 @@ struct MacAccountsView: View {
     @State private var selection: Account.ID?
 
     var body: some View {
-        Group {
-            if let vm {
-                accountsTable(vm: vm)
-            } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
+        accountsTable(vm: vm)
         .navigationTitle("Accounts")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -26,47 +19,40 @@ struct MacAccountsView: View {
                 } label: {
                     Label("New Account", systemImage: "plus")
                 }
-                .disabled(vm == nil)
 
                 Button {
-                    Task { await vm?.hardReload() }
+                    Task { await vm.hardReload() }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .disabled(vm == nil)
             }
         }
-        .searchable(text: searchBinding, placement: .toolbar, prompt: "Search accounts")
+        .searchable(text: $vm.search, placement: .toolbar, prompt: "Search accounts")
         .task {
-            if vm == nil {
-                vm = AccountsViewModel(appState: appState)
-                await vm?.softReload()
+            if vm.accounts.isEmpty {
+                await vm.softReload()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshRequested)) { _ in
-            Task { await vm?.hardReload() }
+            Task { await vm.hardReload() }
         }
         .sheet(isPresented: $showingCreate) {
             CreateAccountSheet { name, offbudget in
-                Task { await vm?.createAccount(name: name, offbudget: offbudget) }
+                Task { await vm.createAccount(name: name, offbudget: offbudget) }
             }
             .frame(width: 360, height: 200)
         }
         .alert("Error", isPresented: errorBinding) {
-            Button("OK") { vm?.errorMessage = nil }
+            Button("OK") { vm.errorMessage = nil }
         } message: {
-            Text(vm?.errorMessage ?? "")
+            Text(vm.errorMessage ?? "")
         }
-    }
-
-    private var searchBinding: Binding<String> {
-        Binding(get: { vm?.search ?? "" }, set: { vm?.search = $0 })
     }
 
     private var errorBinding: Binding<Bool> {
         Binding(
-            get: { vm?.errorMessage != nil },
-            set: { if !$0 { vm?.errorMessage = nil } }
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
         )
     }
 
@@ -109,7 +95,51 @@ struct MacAccountsView: View {
                     MoneyText(amount: vm.balance(for: acc) ?? 0, currencyCode: appState.currencyCode)
                 }
                 .width(min: 100, ideal: 130)
+                TableColumn("Notes") { (acc: Account) in
+                    AccountNoteButton(account: acc, vm: vm)
+                }
+                .width(60)
             }
+        }
+    }
+}
+
+private struct AccountNoteButton: View {
+    let account: Account
+    let vm: AccountsViewModel
+    @State private var showing: Bool = false
+    @State private var draft: String = ""
+
+    var body: some View {
+        Button {
+            draft = vm.accountNote(account.id)
+            showing = true
+        } label: {
+            if vm.accountHasNotes(account.id) {
+                Image(systemName: "note.text")
+                    .foregroundStyle(Color.accentColor)
+            } else {
+                Image(systemName: "note")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.borderless)
+        .help(vm.accountHasNotes(account.id) ? "Edit notes" : "Add notes")
+        .task {
+            await vm.loadAccountNotesIfNeeded(account.id)
+        }
+        .popover(isPresented: $showing, arrowEdge: .trailing) {
+            NotesEditor(
+                title: account.name,
+                text: $draft,
+                onSave: {
+                    let text = draft
+                    Task { await vm.saveAccountNotes(account.id, text: text) }
+                    showing = false
+                },
+                onCancel: { showing = false }
+            )
+            .frame(width: 360, height: 280)
         }
     }
 }

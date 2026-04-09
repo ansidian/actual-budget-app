@@ -3,6 +3,7 @@ import SwiftUI
 struct MacBudgetView: View {
     @EnvironmentObject private var appState: AppState
     @State private var vm: BudgetViewModel?
+    @State private var showingMonthNotes: Bool = false
 
     var body: some View {
         Group {
@@ -30,13 +31,34 @@ struct MacBudgetView: View {
                 }
                 .disabled(vm == nil)
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    Task {
+                        await vm?.loadCurrentMonthNoteIfNeeded()
+                        showingMonthNotes = true
+                    }
+                } label: {
+                    let hasNote = !(vm?.currentMonthNote().isEmpty ?? true)
+                    Label("Month Notes", systemImage: hasNote ? "note.text" : "note")
+                }
+                .disabled(vm == nil)
+
                 Button {
                     Task { await vm?.load() }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm == nil)
+            }
+        }
+        .sheet(isPresented: $showingMonthNotes) {
+            if let vm {
+                NotesEditorSheet(
+                    title: "Notes — \(vm.monthTitle)",
+                    initialText: vm.currentMonthNote(),
+                    onSave: { text in Task { await vm.saveCurrentMonthNote(text) } }
+                )
+                .frame(width: 480, height: 360)
             }
         }
         .task {
@@ -136,11 +158,11 @@ private struct GroupSection: View {
     var body: some View {
         DisclosureGroup(isExpanded: Binding(
             get: { vm.isExpanded(group.id) },
-            set: { _ in vm.toggleExpansion(group.id) }
+            set: { vm.setExpanded(group.id, $0) }
         )) {
             VStack(spacing: 8) {
                 ForEach(group.categories ?? [], id: \.id) { category in
-                    CategoryRow(category: category, currencyCode: currencyCode)
+                    CategoryRow(category: category, vm: vm, currencyCode: currencyCode)
                 }
             }
             .padding(.top, 8)
@@ -161,26 +183,164 @@ private struct GroupSection: View {
 
 private struct CategoryRow: View {
     let category: BudgetMonthCategory
+    let vm: BudgetViewModel
     let currencyCode: String
+    @State private var showingNotes: Bool = false
+    @State private var noteDraft: String = ""
 
-    var body: some View {
+    private enum RowState {
+        case income(received: Int)
+        case zeroActivity
+        case unbudgeted(spent: Int)
+        case overspent(spent: Int, budgeted: Int, overflow: Int)
+        case onTrack(spent: Int, budgeted: Int, balance: Int)
+    }
+
+    private var rowState: RowState {
+        // Income categories in Actual expose their monthly total via a
+        // `received` field. Older data or the HTTP API wrapper may instead
+        // deliver it as a negative `spent` value — fall back to that if
+        // `received` is absent. Finally, `balance` tends to match the
+        // monthly total for income categories and is used as a last resort.
+        if category.is_income == true {
+            let candidate: Int
+            if let r = category.received {
+                candidate = r
+            } else if let s = category.spent, s != 0 {
+                candidate = s
+            } else {
+                candidate = category.balance ?? 0
+            }
+            return .income(received: abs(candidate))
+        }
         let spent = abs(category.spent ?? 0)
         let budgeted = category.budgeted ?? 0
-        let progress = budgeted > 0 ? min(Double(spent) / Double(budgeted), 1.0) : 0.0
+        let balance = category.balance ?? (budgeted - spent)
 
+        if spent == 0 && budgeted == 0 {
+            return .zeroActivity
+        }
+        if budgeted == 0 && spent > 0 {
+            return .unbudgeted(spent: spent)
+        }
+        if balance < 0 {
+            return .overspent(spent: spent, budgeted: budgeted, overflow: -balance)
+        }
+        return .onTrack(spent: spent, budgeted: budgeted, balance: balance)
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(category.name)
-                    .font(.body)
-                Spacer()
-                MoneyText(
-                    amount: category.balance ?? 0,
-                    currencyCode: currencyCode
-                )
-                .foregroundStyle((category.balance ?? 0) < 0 ? .red : .primary)
+            header
+            progressSection
+            footer
+        }
+        .padding(.vertical, 4)
+        .task {
+            await vm.loadCategoryNotesIfNeeded(category.id)
+        }
+    }
+
+    @ViewBuilder
+    private var header: some View {
+        HStack {
+            Text(category.name)
+                .font(.body)
+            Button {
+                noteDraft = vm.categoryNote(category.id)
+                showingNotes = true
+            } label: {
+                if vm.categoryHasNotes(category.id) {
+                    Image(systemName: "note.text")
+                        .foregroundStyle(Color.accentColor)
+                } else {
+                    Image(systemName: "note")
+                        .foregroundStyle(.secondary)
+                }
             }
+            .buttonStyle(.borderless)
+            .help(vm.categoryHasNotes(category.id) ? "Edit notes" : "Add notes")
+            .popover(isPresented: $showingNotes, arrowEdge: .trailing) {
+                NotesEditor(
+                    title: category.name,
+                    text: $noteDraft,
+                    onSave: {
+                        let draft = noteDraft
+                        Task { await vm.saveCategoryNotes(category.id, text: draft) }
+                        showingNotes = false
+                    },
+                    onCancel: { showingNotes = false }
+                )
+                .frame(width: 360, height: 280)
+            }
+            Spacer()
+            switch rowState {
+            case .income(let received):
+                MoneyText(amount: received, currencyCode: currencyCode)
+                    .foregroundStyle(.green)
+            case .zeroActivity:
+                MoneyText(amount: 0, currencyCode: currencyCode)
+                    .foregroundStyle(.secondary)
+            case .unbudgeted(let spent):
+                MoneyText(amount: -spent, currencyCode: currencyCode)
+                    .foregroundStyle(.orange)
+            case .overspent(_, _, let overflow):
+                MoneyText(amount: -overflow, currencyCode: currencyCode)
+                    .foregroundStyle(.red)
+            case .onTrack(_, _, let balance):
+                MoneyText(amount: balance, currencyCode: currencyCode)
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var progressSection: some View {
+        switch rowState {
+        case .income, .zeroActivity:
+            EmptyView()
+        case .unbudgeted:
+            ProgressView(value: 1.0)
+                .tint(.orange)
+        case .overspent:
+            ProgressView(value: 1.0)
+                .tint(.red)
+        case .onTrack(let spent, let budgeted, _):
+            let progress = budgeted > 0 ? min(Double(spent) / Double(budgeted), 1.0) : 0.0
             ProgressView(value: progress)
-                .tint(progress > 0.85 ? .red : .accentColor)
+                .tint(.accentColor)
+        }
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        switch rowState {
+        case .income(let received):
+            HStack {
+                Text("Received: \(CurrencyFormatter.shared.format(received, currencyCode: currencyCode))")
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        case .zeroActivity:
+            EmptyView()
+        case .unbudgeted(let spent):
+            HStack {
+                Text("Spent: \(CurrencyFormatter.shared.format(spent, currencyCode: currencyCode))")
+                Spacer()
+                Text("No budget")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        case .overspent(let spent, let budgeted, _):
+            HStack {
+                Text("Spent: \(CurrencyFormatter.shared.format(spent, currencyCode: currencyCode))")
+                Spacer()
+                Text("Budgeted: \(CurrencyFormatter.shared.format(budgeted, currencyCode: currencyCode))")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        case .onTrack(let spent, let budgeted, _):
             HStack {
                 Text("Spent: \(CurrencyFormatter.shared.format(spent, currencyCode: currencyCode))")
                 Spacer()
@@ -189,6 +349,5 @@ private struct CategoryRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 4)
     }
 }

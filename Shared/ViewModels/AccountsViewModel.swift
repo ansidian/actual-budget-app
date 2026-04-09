@@ -14,6 +14,9 @@ final class AccountsViewModel {
     var isLoading: Bool = false
     var errorMessage: String?
 
+    var accountNotes: [String: String] = [:]
+    var accountNotesLoaded: Set<String> = []
+
     init(appState: AppState) {
         self.appState = appState
     }
@@ -111,6 +114,46 @@ final class AccountsViewModel {
             await hardReload()
         } catch {
             AppLogger.shared.log(error: error, context: "AccountsViewModel.reopenAccount")
+            self.errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Notes
+
+    func accountHasNotes(_ id: String) -> Bool {
+        !(accountNotes[id] ?? "").isEmpty
+    }
+
+    func accountNote(_ id: String) -> String {
+        accountNotes[id] ?? ""
+    }
+
+    func loadAccountNotesIfNeeded(_ id: String) async {
+        guard !accountNotesLoaded.contains(id) else { return }
+        accountNotesLoaded.insert(id)
+        do {
+            let client = try makeClient()
+            let text = try await client.fetchAccountNotes(accountId: id) ?? ""
+            accountNotes[id] = text
+        } catch {
+            AppLogger.shared.log(error: error, context: "AccountsViewModel.loadAccountNotes")
+        }
+    }
+
+    func saveAccountNotes(_ id: String, text: String) async {
+        do {
+            let client = try makeClient()
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                try await client.deleteAccountNotes(accountId: id)
+                accountNotes[id] = ""
+            } else {
+                try await client.setAccountNotes(accountId: id, text: text)
+                accountNotes[id] = text
+            }
+            accountNotesLoaded.insert(id)
+        } catch {
+            AppLogger.shared.log(error: error, context: "AccountsViewModel.saveAccountNotes")
             self.errorMessage = error.localizedDescription
         }
     }

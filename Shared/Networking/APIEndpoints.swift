@@ -32,4 +32,13 @@ enum APIEndpoints {
     static func month(base: URL, syncId: String, month: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/months/\(month)") }
     static func monthCategoryGroups(base: URL, syncId: String, month: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/months/\(month)/categorygroups") }
     static func monthCategories(base: URL, syncId: String, month: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/months/\(month)/categories") }
+
+    // Notes
+    static func categoryNotes(base: URL, syncId: String, categoryId: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/notes/category/\(categoryId)") }
+    static func accountNotes(base: URL, syncId: String, accountId: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/notes/account/\(accountId)") }
+    static func budgetMonthNotes(base: URL, syncId: String, month: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/notes/budgetmonth/\(month)") }
+
+    // Schedules
+    static func schedules(base: URL, syncId: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/schedules") }
+    static func schedule(base: URL, syncId: String, id: String) -> URL { base.appendingPathComponent("/budgets/\(syncId)/schedules/\(id)") }
 }
