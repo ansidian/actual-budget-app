@@ -74,10 +74,16 @@ private struct AppearanceTab: View {
 
 private struct AdvancedTab: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showingLogs: Bool = false
 
     var body: some View {
         Form {
             Toggle("Demo Mode", isOn: $appState.isDemoMode)
+            Section("Diagnostics") {
+                Button("View Application Logs") {
+                    showingLogs = true
+                }
+            }
             Section {
                 Button("Reset Configuration", role: .destructive) {
                     appState.resetConfiguration()
@@ -86,5 +92,9 @@ private struct AdvancedTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .sheet(isPresented: $showingLogs) {
+            MacLogsView()
+                .frame(width: 700, height: 500)
+        }
     }
 }

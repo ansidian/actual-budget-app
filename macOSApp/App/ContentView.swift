@@ -46,19 +46,21 @@ struct ContentView: View {
             .navigationTitle("Actual Budget")
             .frame(minWidth: 180)
         } detail: {
-            Group {
-                switch selected.wrappedValue ?? .dashboard {
-                case .dashboard:
-                    PlaceholderView(title: "Dashboard")
-                case .accounts:
-                    PlaceholderView(title: "Accounts")
-                case .budget:
-                    PlaceholderView(title: "Budget")
-                case .transactions:
-                    PlaceholderView(title: "Transactions")
+            NavigationStack {
+                Group {
+                    switch selected.wrappedValue ?? .dashboard {
+                    case .dashboard:
+                        MacDashboardView()
+                    case .accounts:
+                        MacAccountsView()
+                    case .budget:
+                        MacBudgetView()
+                    case .transactions:
+                        MacTransactionsView()
+                    }
                 }
+                .frame(minWidth: 700, minHeight: 480)
             }
-            .frame(minWidth: 600, minHeight: 400)
         }
         .onAppear {
             if !appState.isConfigured {
@@ -73,19 +75,3 @@ struct ContentView: View {
     }
 }
 
-private struct PlaceholderView: View {
-    let title: String
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "hammer")
-                .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
-            Text("\(title) — coming soon")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(title)
-    }
-}
