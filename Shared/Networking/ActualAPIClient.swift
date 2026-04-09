@@ -120,6 +120,7 @@ final class ActualAPIClient {
     }
 
     func createAccount(name: String, offbudget: Bool) async throws -> String {
+        if isDemoMode { return "demo-account-\(UUID().uuidString.prefix(8))" }
         let url = APIEndpoints.accounts(base: baseURL, syncId: syncId)
         var request = try buildRequest(url: url, method: "POST")
         let body: [String: Any] = [
@@ -136,6 +137,7 @@ final class ActualAPIClient {
     }
     
     func deleteAccount(accountId: String) async throws {
+        if isDemoMode { return }
         let url = APIEndpoints.account(base: baseURL, syncId: syncId, accountId: accountId)
         let request = try buildRequest(url: url, method: "DELETE")
         let (data, response) = try await session.data(for: request)
@@ -143,6 +145,7 @@ final class ActualAPIClient {
     }
 
     func closeAccount(accountId: String, transferAccountId: String?, transferCategoryId: String?) async throws {
+        if isDemoMode { return }
         let url = APIEndpoints.accountClose(base: baseURL, syncId: syncId, accountId: accountId)
         var request = try buildRequest(url: url, method: "PUT")
         var transfer: [String: Any] = [:]
@@ -168,6 +171,7 @@ final class ActualAPIClient {
     }
 
     func reopenAccount(accountId: String) async throws {
+        if isDemoMode { return }
         let url = APIEndpoints.accountReopen(base: baseURL, syncId: syncId, accountId: accountId)
         let request = try buildRequest(url: url, method: "PUT")
         let (data, response) = try await session.data(for: request)

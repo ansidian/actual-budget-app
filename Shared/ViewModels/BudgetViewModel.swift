@@ -60,6 +60,7 @@ final class BudgetViewModel {
     // MARK: - Loading
 
     func load() async {
+        guard appState.isConfigured else { return }
         isLoading = true
         defer { isLoading = false }
         do {

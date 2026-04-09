@@ -67,6 +67,11 @@ struct ContentView: View {
                 showingOnboarding = true
             }
         }
+        .onChange(of: appState.isConfigured) { _, configured in
+            if !configured && !showingOnboarding {
+                showingOnboarding = true
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .switchSidebarSection)) { note in
             if let raw = note.object as? String, SidebarSection(rawValue: raw) != nil {
                 selectedRaw = raw

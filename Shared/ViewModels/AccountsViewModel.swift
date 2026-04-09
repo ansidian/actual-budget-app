@@ -41,6 +41,7 @@ final class AccountsViewModel {
     func hardReload() async { await load(clearBalances: true) }
 
     private func load(clearBalances: Bool) async {
+        guard appState.isConfigured else { return }
         isLoading = true
         defer { isLoading = false }
         do {
