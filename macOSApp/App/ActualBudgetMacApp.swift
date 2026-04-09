@@ -25,6 +25,36 @@ struct ActualBudgetMacApp: App {
                 }
                 .keyboardShortcut("r", modifiers: [.command])
             }
+            CommandMenu("Go") {
+                Button("Dashboard") {
+                    NotificationCenter.default.post(
+                        name: .switchSidebarSection,
+                        object: SidebarSection.dashboard.rawValue
+                    )
+                }
+                .keyboardShortcut("1", modifiers: [.command])
+                Button("Accounts") {
+                    NotificationCenter.default.post(
+                        name: .switchSidebarSection,
+                        object: SidebarSection.accounts.rawValue
+                    )
+                }
+                .keyboardShortcut("2", modifiers: [.command])
+                Button("Budget") {
+                    NotificationCenter.default.post(
+                        name: .switchSidebarSection,
+                        object: SidebarSection.budget.rawValue
+                    )
+                }
+                .keyboardShortcut("3", modifiers: [.command])
+                Button("Transactions") {
+                    NotificationCenter.default.post(
+                        name: .switchSidebarSection,
+                        object: SidebarSection.transactions.rawValue
+                    )
+                }
+                .keyboardShortcut("4", modifiers: [.command])
+            }
         }
 
         Settings {
@@ -37,4 +67,5 @@ struct ActualBudgetMacApp: App {
 extension Notification.Name {
     static let newTransactionRequested = Notification.Name("ActualBudgetMac.newTransactionRequested")
     static let refreshRequested = Notification.Name("ActualBudgetMac.refreshRequested")
+    static let switchSidebarSection = Notification.Name("ActualBudgetMac.switchSidebarSection")
 }

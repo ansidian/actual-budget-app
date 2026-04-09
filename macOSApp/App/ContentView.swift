@@ -67,6 +67,11 @@ struct ContentView: View {
                 showingOnboarding = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchSidebarSection)) { note in
+            if let raw = note.object as? String, SidebarSection(rawValue: raw) != nil {
+                selectedRaw = raw
+            }
+        }
         .sheet(isPresented: $showingOnboarding) {
             OnboardingSheet()
                 .environmentObject(appState)

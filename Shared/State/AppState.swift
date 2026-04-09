@@ -22,13 +22,25 @@ final class AppState: ObservableObject {
         }
     }
     @Published var apiKey: String {
-        didSet { UserDefaults.standard.set(apiKey, forKey: Keys.apiKey) }
+        didSet {
+            #if os(macOS)
+            KeychainStorage.write(apiKey, for: Keys.apiKey)
+            #else
+            UserDefaults.standard.set(apiKey, forKey: Keys.apiKey)
+            #endif
+        }
     }
     @Published var syncId: String {
         didSet { UserDefaults.standard.set(syncId, forKey: Keys.syncId) }
     }
     @Published var budgetEncryptionPassword: String {
-        didSet { UserDefaults.standard.set(budgetEncryptionPassword, forKey: Keys.budgetEncryptionPassword) }
+        didSet {
+            #if os(macOS)
+            KeychainStorage.write(budgetEncryptionPassword, for: Keys.budgetEncryptionPassword)
+            #else
+            UserDefaults.standard.set(budgetEncryptionPassword, forKey: Keys.budgetEncryptionPassword)
+            #endif
+        }
     }
     @Published var isDemoMode: Bool {
         didSet { UserDefaults.standard.set(isDemoMode, forKey: Keys.isDemoMode) }
@@ -41,12 +53,37 @@ final class AppState: ObservableObject {
 
     init() {
         self.baseURLString = UserDefaults.standard.string(forKey: Keys.baseURL) ?? ""
-        self.apiKey = UserDefaults.standard.string(forKey: Keys.apiKey) ?? ""
         self.syncId = UserDefaults.standard.string(forKey: Keys.syncId) ?? ""
-        self.budgetEncryptionPassword = UserDefaults.standard.string(forKey: Keys.budgetEncryptionPassword) ?? ""
         self.isDemoMode = UserDefaults.standard.bool(forKey: Keys.isDemoMode)
         self.currencyCode = UserDefaults.standard.string(forKey: Keys.currencyCode) ?? Locale.current.currency?.identifier ?? "USD"
-        
+
+        #if os(macOS)
+        // Prefer Keychain on macOS. Migrate any legacy UserDefaults values
+        // into the Keychain on first launch and remove the plaintext copy.
+        if let stored = KeychainStorage.read(Keys.apiKey) {
+            self.apiKey = stored
+        } else if let legacy = UserDefaults.standard.string(forKey: Keys.apiKey), !legacy.isEmpty {
+            self.apiKey = legacy
+            KeychainStorage.write(legacy, for: Keys.apiKey)
+            UserDefaults.standard.removeObject(forKey: Keys.apiKey)
+        } else {
+            self.apiKey = ""
+        }
+
+        if let stored = KeychainStorage.read(Keys.budgetEncryptionPassword) {
+            self.budgetEncryptionPassword = stored
+        } else if let legacy = UserDefaults.standard.string(forKey: Keys.budgetEncryptionPassword), !legacy.isEmpty {
+            self.budgetEncryptionPassword = legacy
+            KeychainStorage.write(legacy, for: Keys.budgetEncryptionPassword)
+            UserDefaults.standard.removeObject(forKey: Keys.budgetEncryptionPassword)
+        } else {
+            self.budgetEncryptionPassword = ""
+        }
+        #else
+        self.apiKey = UserDefaults.standard.string(forKey: Keys.apiKey) ?? ""
+        self.budgetEncryptionPassword = UserDefaults.standard.string(forKey: Keys.budgetEncryptionPassword) ?? ""
+        #endif
+
         let savedTheme = UserDefaults.standard.string(forKey: Keys.currentTheme) ?? ""
         self.currentTheme = Theme(rawValue: savedTheme) ?? .amoledDark
         AppLogger.shared.updateRedactionBaseURL(self.baseURLString)
