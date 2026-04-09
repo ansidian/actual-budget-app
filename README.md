@@ -1,7 +1,10 @@
-# Actual Accounts iOS App
+# Actual Accounts — Native macOS Client
 
+> ⚠️ **Very early WIP.** This is an in-progress native Swift/SwiftUI **macOS** client for [Actual Budget](https://actualbudget.org). Expect rough edges, missing features, and breaking changes.
 
-A modern, native iOS app for managing your personal finances with the Actual Budget backend. Built with SwiftUI and designed for a clean, intuitive user experience.
+This fork focuses exclusively on building out the **macOS** experience. It builds on the excellent work of [BearTS](https://github.com/BearTS/actual-budget-app), whose original repository is a native **iOS/mobile** Swift app for Actual. The iOS target still lives in this repo for now, but active development here is on the macOS client — the iOS side is not a priority and may lag behind or be removed later.
+
+A native app for managing your personal finances with the Actual Budget backend, built with SwiftUI.
 
 ## Features
 
@@ -114,8 +117,9 @@ For commercial licensing inquiries, please contact the author.
 
 ## Acknowledgments
 
+- **[BearTS/actual-budget-app](https://github.com/BearTS/actual-budget-app)**: Original author of the native Swift iOS app this project is forked from. The macOS client is built on top of his groundwork.
 - **Actual Budget**: The open-source budgeting backend that powers this app
-- **Actual Http API**: The open source http wrapper around the actual budget app, link [here](https://github.com/jhonderson/actual-http-api) 
+- **Actual Http API**: The open source http wrapper around the actual budget app, link [here](https://github.com/jhonderson/actual-http-api)
 - **SwiftUI Community**: For inspiration and best practices
 
 ## Support
